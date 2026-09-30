@@ -132,31 +132,42 @@ const server = http.createServer(async (req, res) => {
         encodeURIComponent(MODEL) +
         ':generateContent';
 
-      const response = await fetch(apiUrl, {
-        method: 'POST',
+     let response;
 
-        headers: {
-          'Content-Type': 'application/json',
-          'x-goog-api-key': API_KEY
-        },
+for (let attempt = 0; attempt < 4; attempt++) {
+  response = await fetch(apiUrl, {
+    method: 'POST',
 
-        body: JSON.stringify({
-          systemInstruction: {
-            parts: [
-              {
-                text: LUMI_PERSONALITY
-              }
-            ]
-          },
+    headers: {
+      'Content-Type': 'application/json',
+      'x-goog-api-key': API_KEY
+    },
 
-          contents: makeContents(history, message),
-
-          generationConfig: {
-            temperature: 0.85,
-            responseMimeType: 'application/json'
+    body: JSON.stringify({
+      systemInstruction: {
+        parts: [
+          {
+            text: LUMI_PERSONALITY
           }
-        })
-      });
+        ]
+      },
+
+      contents: makeContents(history, message),
+
+      generationConfig: {
+        temperature: 0.85,
+        responseMimeType: 'application/json'
+      }
+    })
+  });
+
+  if (response.status !== 503 || attempt === 3) {
+    break;
+  }
+
+  const waitMs = 1000 * Math.pow(2, attempt);
+  await new Promise(resolve => setTimeout(resolve, waitMs));
+}
 
       if (!response.ok) {
         const detail = await response.text();
