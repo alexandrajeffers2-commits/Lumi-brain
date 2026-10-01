@@ -206,6 +206,8 @@ for (let attempt = 0; attempt < 4; attempt++) {
       });
 
     } catch (error) {
+      console.error('LUMI ERROR:', error);
+      
 
       return send(res, 500, {
         error: error.message || 'Lumi Brain error'
