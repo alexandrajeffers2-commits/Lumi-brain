@@ -8,7 +8,57 @@
 <div class="section"><h3>✨ SPECIAL ACTIONS</h3><div class="grid"><button class="btn" data-action="dance">💃 Dance</button><button class="btn" data-action="love">💗 Love</button><button class="btn" data-action="hello">👋 Hello</button><button class="btn" data-action="pretty">🥰 Pretty</button></div></div></section>
 <section class="panel col"><div class="title">LIVE CHAT</div><div class="section"><h3>🎙️ Voice</h3><select id="voices" class="voice"></select><div class="small"><span class="statusDot"></span>Choose a voice, then press Test Voice. V8 keeps the best available English browser voice.</div><div class="meter"><i id="voiceMeter"></i></div><button class="btn" id="testVoice" style="margin-top:8px;width:100%">▶ Test Voice</button></div><div class="section"><div id="chat" class="chat"></div><div class="input"><input id="input" placeholder="Type a viewer comment..."><button class="send" id="send">Send</button></div></div><div class="section"><h3>V9 — AI BRAIN TEST</h3><p>V8.1 visuals stay intact. When the separate brain server is configured, Lumi can generate new replies and choose her own emotion.</p><p>Try <b>Shy → Playful → Dance → Lion → Crown</b>. Mood changes should use Lumi herself. Gift effects should play once briefly, then disappear.</p></div></section></main>
 <script src="brain.js"></script>
-<script>
+const LUMI_VOICE_API = 'https://bookmark-improved-rim-cups.trycloudflare.com';
+
+async function speak(t){
+  const text = String(t || '')
+    .replace(/[^\p{L}\p{N}\s.,!?'"-]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!text) return;
+
+  try {
+    if ('speechSynthesis' in window) speechSynthesis.cancel();
+
+    startMeter();
+
+    const response = await fetch(LUMI_VOICE_API + '/speak', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({text})
+    });
+
+    if (!response.ok) throw new Error('Voice server ' + response.status);
+
+    const blob = await response.blob();
+    const audioUrl = URL.createObjectURL(blob);
+    const audio = new Audio(audioUrl);
+
+    audio.onended = () => {
+      stopMeter();
+      URL.revokeObjectURL(audioUrl);
+    };
+
+    audio.onerror = () => {
+      stopMeter();
+      URL.revokeObjectURL(audioUrl);
+    };
+
+    await audio.play();
+
+  } catch (error) {
+    console.warn('Lumi cloned voice unavailable:', error);
+    stopMeter();
+
+    if ('speechSynthesis' in window) {
+      const u = new SpeechSynthesisUtterance(text);
+      u.rate = 0.9;
+      u.pitch = 1;
+      speechSynthesis.speak(u);
+    }
+  }
+}/<script>
 const hero=document.getElementById('hero'),R=document.getElementById('reply'),M=document.getElementById('mood'),FX=document.getElementById('fx'),C=document.getElementById('chat'),BLINK=document.getElementById('blink'),VM=document.getElementById('voiceMeter');let voices=[],meterTimer=null;
 const moods={happy:['happy_full.png','HAPPY','Aww, I’m happy you’re here with me!'],shy:['shy_full.png','SHY','Stoppp… you’re making me shy.'],surprised:['surprised_full.png','SURPRISED','Wait—WHAT?!'],playful:['playful_full.png','PLAYFUL','Hehe! Okay, let’s have some fun.'],angry:['angry_full.png','CUTE ANGRY','Heyyy! Be nice to Lumi!'],sad:['sad_full.png','SAD','Aww… stay with me for a cozy minute.']};
 const gifts={rose:['rose_action.png','ROSE','A rose? For me? Aww, thank you!','🌹'],love:['love_action.png','HEART ME','You just made my heart so happy!','💗'],tiktok:['tiktok_action.png','TIKTOK GIFT','A TikTok gift! Thank youuu!','🎵'],car:['car_action.png','SPORTS CAR','OMG, a sports car?! You’re spoiling me!','✨'],lion:['lion_action.png','LION','A LION?! Oh my gosh! Thank you so much!','🦁'],crown:['crown_action.png','CROWN','A crown?! You’re treating me like royalty!','👑']};
