@@ -197,7 +197,9 @@ async function connectTikTok(username) {
 
     const connection = new TikTokLiveConnection(cleanUsername, {
       processInitialData: false,
-      enableExtendedGiftInfo: true
+      enableExtendedGiftInfo: true,
+      connectWithUniqueId: true,
+      disableEulerFallbacks: true
     });
 
     connection.on(WebcastEvent.CHAT, data => {
