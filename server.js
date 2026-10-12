@@ -5,14 +5,14 @@ const PORT = Number(process.env.PORT || 10000);
 const API_KEY = process.env.GEMINI_API_KEY || '';
 const MODEL = process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite';
 
-
 const allowed = new Set([
   'happy',
   'shy',
   'surprised',
   'playful',
   'angry',
-  'sad'
+  'sad',
+  'distracted'
 ]);
 
 function send(res, status, obj) {
@@ -29,8 +29,8 @@ function send(res, status, obj) {
 function parseJsonText(text) {
   text = String(text || '')
     .trim()
-    .replace(/^```json\s*/i, '')
-    .replace(/```$/i, '')
+    .replace(/^\`\`\`json\s*/i, '')
+    .replace(/\`\`\`$/i, '')
     .trim();
 
   return JSON.parse(text);
@@ -133,42 +133,42 @@ const server = http.createServer(async (req, res) => {
         encodeURIComponent(MODEL) +
         ':generateContent';
 
-     let response;
+      let response;
 
-for (let attempt = 0; attempt < 4; attempt++) {
-  response = await fetch(apiUrl, {
-    method: 'POST',
+      for (let attempt = 0; attempt < 4; attempt++) {
+        response = await fetch(apiUrl, {
+          method: 'POST',
 
-    headers: {
-      'Content-Type': 'application/json',
-      'x-goog-api-key': API_KEY
-    },
+          headers: {
+            'Content-Type': 'application/json',
+            'x-goog-api-key': API_KEY
+          },
 
-    body: JSON.stringify({
-      systemInstruction: {
-        parts: [
-          {
-            text: LUMI_PERSONALITY
-          }
-        ]
-      },
+          body: JSON.stringify({
+            systemInstruction: {
+              parts: [
+                {
+                  text: LUMI_PERSONALITY
+                }
+              ]
+            },
 
-      contents: makeContents(history, message),
+            contents: makeContents(history, message),
 
-      generationConfig: {
-        temperature: 0.85,
-        responseMimeType: 'application/json'
+            generationConfig: {
+              temperature: 0.85,
+              responseMimeType: 'application/json'
+            }
+          })
+        });
+
+        if (response.status !== 503 || attempt === 3) {
+          break;
+        }
+
+        const waitMs = 1000 * Math.pow(2, attempt);
+        await new Promise(resolve => setTimeout(resolve, waitMs));
       }
-    })
-  });
-
-  if (response.status !== 503 || attempt === 3) {
-    break;
-  }
-
-  const waitMs = 1000 * Math.pow(2, attempt);
-  await new Promise(resolve => setTimeout(resolve, waitMs));
-}
 
       if (!response.ok) {
         const detail = await response.text();
@@ -208,7 +208,6 @@ for (let attempt = 0; attempt < 4; attempt++) {
 
     } catch (error) {
       console.error('LUMI ERROR:', error);
-      
 
       return send(res, 500, {
         error: error.message || 'Lumi Brain error'
