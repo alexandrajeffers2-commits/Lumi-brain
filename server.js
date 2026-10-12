@@ -154,7 +154,7 @@ async function loadTikTokModule() {
 async function disconnectTikTok() {
   if (tiktokConnection) {
     try {
-      tiktokConnection.disconnect();
+      await tiktokConnection.disconnect();
     } catch (error) {
       console.error('TikTok disconnect error:', error);
     }
@@ -175,6 +175,8 @@ async function connectTikTok(username) {
     throw new Error('TikTok username is required');
   }
 
+  console.log('[TikTok] connect requested for @' + cleanUsername);
+
   await disconnectTikTok();
 
   tiktokStatus = {
@@ -185,34 +187,40 @@ async function connectTikTok(username) {
     error: ''
   };
 
-  const { TikTokLiveConnection, WebcastEvent } =
-    await loadTikTokModule();
-
-  const connection = new TikTokLiveConnection(cleanUsername, {
-    processInitialData: false,
-    enableExtendedGiftInfo: true
-  });
-
-  connection.on(WebcastEvent.CHAT, data => {
-    const viewer =
-      data?.user?.uniqueId ||
-      data?.user?.nickname ||
-      'viewer';
-
-    const comment = String(data?.comment || '').trim();
-
-    if (!comment) return;
-
-    pushTikTokEvent({
-      type: 'chat',
-      viewer,
-      comment
-    });
-  });
-
-  tiktokConnection = connection;
-
   try {
+    const mod = await loadTikTokModule();
+    const { TikTokLiveConnection, WebcastEvent } = mod;
+
+    if (!TikTokLiveConnection || !WebcastEvent) {
+      throw new Error('TikTok connector module loaded without expected exports');
+    }
+
+    const connection = new TikTokLiveConnection(cleanUsername, {
+      processInitialData: false,
+      enableExtendedGiftInfo: true
+    });
+
+    connection.on(WebcastEvent.CHAT, data => {
+      const viewer =
+        data?.user?.uniqueId ||
+        data?.user?.nickname ||
+        'viewer';
+
+      const comment = String(data?.comment || '').trim();
+
+      if (!comment) return;
+
+      console.log('[TikTok] chat @' + viewer + ': ' + comment);
+
+      pushTikTokEvent({
+        type: 'chat',
+        viewer,
+        comment
+      });
+    });
+
+    tiktokConnection = connection;
+
     const state = await connection.connect();
 
     tiktokStatus.connected = true;
@@ -224,8 +232,28 @@ async function connectTikTok(username) {
     );
     tiktokStatus.error = '';
 
+    console.log(
+      '[TikTok] connected @' +
+      cleanUsername +
+      ' room ' +
+      (tiktokStatus.roomId || '(unknown)')
+    );
+
     return { ...tiktokStatus };
+
   } catch (error) {
+    const message =
+      error?.stack ||
+      error?.message ||
+      String(error);
+
+    console.error(
+      '[TikTok] connect failed for @' +
+      cleanUsername +
+      ': ' +
+      message
+    );
+
     tiktokStatus.connected = false;
     tiktokStatus.connecting = false;
     tiktokStatus.error =
@@ -424,10 +452,15 @@ const server = http.createServer(async (req, res) => {
     requestUrl.pathname === '/tiktok/connect' &&
     req.method === 'POST'
   ) {
+    let attemptedUsername = '';
+
     try {
       const body = await readBody(req);
+      attemptedUsername = String(body.username || '');
+      console.log('[TikTok] /tiktok/connect body username=' + attemptedUsername);
+
       const status = await connectTikTok(
-        body.username
+        attemptedUsername
       );
 
       return send(res, 200, {
@@ -435,6 +468,13 @@ const server = http.createServer(async (req, res) => {
         ...status
       });
     } catch (error) {
+      console.error(
+        '[TikTok] /tiktok/connect failed for ' +
+        attemptedUsername +
+        ': ' +
+        (error?.stack || error?.message || String(error))
+      );
+
       return send(res, 400, {
         ok: false,
         error:
