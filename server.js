@@ -29,8 +29,8 @@ function send(res, status, obj) {
 function parseJsonText(text) {
   text = String(text || '')
     .trim()
-    .replace(/^\`\`\`json\s*/i, '')
-    .replace(/\`\`\`$/i, '')
+    .replace(/^```json\s*/i, '')
+    .replace(/```$/i, '')
     .trim();
 
   return JSON.parse(text);
@@ -63,6 +63,31 @@ function makeContents(history, message) {
   });
 
   return contents;
+}
+
+function emotionOverride(message, modelEmotion) {
+  const m = String(message || '').toLowerCase();
+
+  const distractedPatterns = [
+    /what (are|r) you doing/,
+    /what you doing/,
+    /what('s| is) lumi doing/,
+    /are you busy/,
+    /on your phone/,
+    /using your phone/,
+    /checking your phone/,
+    /on the computer/,
+    /using the computer/,
+    /at the computer/,
+    /typing/,
+    /checking something/
+  ];
+
+  if (distractedPatterns.some(pattern => pattern.test(m))) {
+    return 'distracted';
+  }
+
+  return modelEmotion;
 }
 
 const server = http.createServer(async (req, res) => {
@@ -201,9 +226,14 @@ const server = http.createServer(async (req, res) => {
         );
       }
 
+      const finalEmotion = emotionOverride(
+        message,
+        output.emotion
+      );
+
       return send(res, 200, {
         reply: output.reply.trim(),
-        emotion: output.emotion
+        emotion: finalEmotion
       });
 
     } catch (error) {
